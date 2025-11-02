@@ -10,6 +10,10 @@ const io = new Server(server);
 // Serve static files from /public
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // In-memory rooms
 const rooms = {}; // code -> { host, code, round, players, bots, teams, scores, duels }
 
