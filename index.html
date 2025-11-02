@@ -1,23 +1,36 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Batalla de Roedores Online</title>
 <style>
-body { background: linear-gradient(#19191a,#04293a); font-family: 'PixelOperator', monospace; color:#fff; text-align:center; margin:0; padding:0;}
-#game-container { width:90%; max-width:720px; margin:20px auto; border:4px solid #000; background:#fff8e7; border-radius:12px; box-shadow:0 0 10px #0005; padding:15px; color:#111; position:relative;}
-h2 { margin:8px 0 12px 0; color:#080808; }
-#battlefield { position:relative; width:100%; height:260px; background: url("fondo_bosque.png") no-repeat center center / cover; border:2px solid #000; margin-bottom:15px; border-radius:8px; overflow:hidden; }
-#player,#enemy { position:absolute; bottom:20px; width:120px; image-rendering:pixelated; transition: transform 0.4s ease; }
-#player{ left:30px } #enemy{ right:30px; transform:scaleX(-1); }
+body { margin:0; padding:0; font-family: 'PixelOperator', monospace; background: linear-gradient(#19191a,#04293a); color:#fff; text-align:center; }
+#game-container { width:90%; max-width:900px; margin:10px auto; border-radius:12px; background:#fff8e7; color:#111; box-shadow:0 0 15px #0008; padding:15px; }
+h2 { margin:10px 0; }
+#battlefield { position:relative; width:100%; height:300px; background: url("fondo_bosque.png") no-repeat center center / cover; border:2px solid #000; margin-bottom:10px; border-radius:8px; overflow:hidden; }
+#player,#enemy { position:absolute; bottom:20px; width:120px; image-rendering:pixelated; transition: transform 0.4s ease; z-index:5; }
+#player{ left:30px; } #enemy{ right:30px; transform:scaleX(-1); }
+.projectile { position:absolute; width:50px; height:50px; image-rendering:pixelated; z-index:10; }
+.meditation { position:absolute; width:150px; height:150px; border-radius:50%; background:rgba(0,255,200,0.3); bottom:10px; left:0; right:0; margin:auto; z-index:4; animation:meditate 1s linear infinite; }
+@keyframes meditate { 0%{ transform:scale(0.8); opacity:0.5;}50%{transform:scale(1.2); opacity:1;}100%{transform:scale(0.8); opacity:0.5;} }
+
+.health-bar { height:20px; width:90%; max-width:500px; background:#ddd; border:2px solid #000; margin:5px auto; border-radius:8px; overflow:hidden; }
+.health-fill { height:100%; background:#4caf50; width:100%; transition: width 0.3s; }
+
 #question-container { background:#f0e68c; border:2px solid #000; border-radius:8px; padding:10px; margin-bottom:10px; }
 .option { display:block; background:#fff; border:2px solid #000; border-radius:6px; padding:8px; margin:6px auto; width:90%; cursor:pointer; font-weight:bold; }
 .option:hover{ background:#cde } .option:disabled{ opacity:0.6; cursor:default }
+#log { background:#fff; border:2px solid #000; border-radius:6px; height:120px; overflow-y:auto; padding:5px; text-align:left; font-size:12px; color:#000; margin-bottom:10px; }
 #special-button { background:#ffeb3b; border:3px solid #000; border-radius:6px; padding:8px; cursor:pointer; margin-top:5px; font-weight:bold; }
 #special-button:disabled { opacity:0.6; cursor:default }
-#log { background:#fff; border:2px solid #000; border-radius:6px; height:100px; overflow-y:auto; padding:5px; text-align:left; font-size:12px; color:#000; }
-#status-bar { font-weight:bold; font-size:16px; margin-bottom:6px; color:#000; }
+
+#host-panel { background:#f0f0f0; color:#000; padding:10px; border-radius:8px; margin-bottom:10px; display:none; max-height:300px; overflow-y:auto; }
+#host-panel table { width:100%; border-collapse:collapse; }
+#host-panel th, #host-panel td { border:1px solid #000; padding:4px; font-size:12px; text-align:center; }
+#host-panel th { background:#ddd; }
+#start-round-btn { background:#ff5722; color:#fff; padding:6px 12px; cursor:pointer; border:none; border-radius:6px; font-weight:bold; margin-bottom:5px; }
+
 #energy-container { display:flex; justify-content:center; gap:6px; margin:5px auto; }
 .energy-segment { width:60px; height:18px; background:#ddd; border:2px solid #000; border-radius:6px; overflow:hidden; }
 .energy-fill { height:100%; width:0%; background:#00bcd4; transition: width 0.3s; }
@@ -27,161 +40,215 @@ h2 { margin:8px 0 12px 0; color:#080808; }
 </head>
 <body>
 <div id="game-container">
-  <h2>Roedores a por la supervivencia Online</h2>
+<h2>Batalla de Roedores Online</h2>
 
-  <div id="player-list">
-    <p>Jugadores en sala:</p>
-    <ul id="players-ul"></ul>
-  </div>
+<div id="host-code-container">
+<p id="host-code-text">Código de sala: <span id="room-code">XXXX</span></p>
+</div>
 
-  <button id="start-btn">Comenzar Partida</button>
+<div id="host-panel">
+<button id="start-round-btn">Iniciar Ronda</button>
+<table>
+<thead>
+<tr><th>Jugador</th><th>Equipo</th><th>Puntos</th><th>Salud</th></tr>
+</thead>
+<tbody id="host-table-body"></tbody>
+</table>
+</div>
 
-  <div id="battlefield">
-    <img id="player" src="" alt="Jugador">
-    <img id="enemy" src="" alt="Enemigo">
-    <div id="log"></div>
-  </div>
+<div id="battlefield">
+<img id="player" src="" alt="Jugador">
+<img id="enemy" src="" alt="Enemigo">
+</div>
 
-  <div id="status-bar">
-    Salud: <span id="player-health">0</span> | Rival: <span id="enemy-health">0</span>
-  </div>
+<div>
+Puntos: <span id="score">0</span> | Tiempo: <span id="timer-display">30</span>s
+</div>
 
-  <div id="energy-container">
-    <div class="energy-segment"><div id="energy1" class="energy-fill"></div></div>
-    <div class="energy-segment"><div id="energy2" class="energy-fill"></div></div>
-    <div class="energy-segment"><div id="energy3" class="energy-fill"></div></div>
-  </div>
+<div>
+<strong>Salud Jugador:</strong>
+<div class="health-bar"><div id="player-health" class="health-fill"></div></div>
+<strong>Salud Enemigo:</strong>
+<div class="health-bar"><div id="enemy-health" class="health-fill"></div></div>
+<strong>Energía:</strong>
+<div id="energy-container">
+<div class="energy-segment"><div id="energy1" class="energy-fill"></div></div>
+<div class="energy-segment"><div id="energy2" class="energy-fill"></div></div>
+<div class="energy-segment"><div id="energy3" class="energy-fill"></div></div>
+</div>
+</div>
 
-  <div id="question-container">
-    <p id="question-text">Esperando partida...</p>
-    <div id="options"></div>
-  </div>
+<div id="question-container">
+<p id="question-text"></p>
+<div id="options"></div>
+</div>
 
-  <button id="special-button" disabled>Habilidad Especial</button>
+<button id="special-button" disabled>Habilidad Especial</button>
+<div id="log"></div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
-let playerId=null;
-let playerData=null;
-let rivalData=null;
-let currentQuestion=null;
-let energySegments=0;
+const socket=io();
+let player=null, enemy=null, currentQuestion=null, timer=null, timeLeft=30;
+let score=0, playerStreak=0;
 
-// UI elements
-const playersUl = document.getElementById("players-ul");
-const startBtn = document.getElementById("start-btn");
-const playerImg = document.getElementById("player");
-const enemyImg = document.getElementById("enemy");
-const logDiv = document.getElementById("log");
-const questionText = document.getElementById("question-text");
-const optionsDiv = document.getElementById("options");
-const specialButton = document.getElementById("special-button");
+const characters=[
+{name:"Ardilla Roja",img:"Ardilla roja.png",attackImg:"Ardilla_ataque.png",special:"nuez"},
+{name:"Ratón",img:"Raton.png",attackImg:"Raton_ataque.png",special:"doble"},
+{name:"Capibara",img:"Capibara.png",attackImg:"Capibara_ataque.png",special:"meditar"}
+];
 
-// =================== CONEXIÓN ===================
-socket.on("connect", ()=>{
-  playerId = socket.id;
-  log("Conectado al servidor. Esperando jugadores...");
-});
+const playerImg=document.getElementById("player");
+const enemyImg=document.getElementById("enemy");
+const playerHealthBar=document.getElementById("player-health");
+const enemyHealthBar=document.getElementById("enemy-health");
+const questionText=document.getElementById("question-text");
+const optionsDiv=document.getElementById("options");
+const scoreDisplay=document.getElementById("score");
+const timerDisplay=document.getElementById("timer-display");
+const specialButton=document.getElementById("special-button");
+const logDiv=document.getElementById("log");
+const battlefield=document.getElementById("battlefield");
 
-socket.on("updatePlayerList", data=>{
-  playersUl.innerHTML = "";
-  data.forEach(p=>{ 
-    const li = document.createElement("li"); 
-    li.textContent = p.name + (p.id===playerId ? " (Tú)" : "");
-    playersUl.appendChild(li);
-  });
-});
+const questions=[
+  { q: "¿Qué orden de mamíferos es el más diverso del planeta?", options: ["Carnivora", "Rodentia", "Chiroptera", "Primates"], correct: 1 },
+  { q: "¿Cuántas especies aproximadas de roedores existen?", options: ["500", "1.200", "2.050", "4.000"], correct: 2 },
+  { q: "¿En qué continente no se encuentran los roedores de forma natural?", options: ["Asia", "Oceanía", "África", "Antártida"], correct: 3 },
+  { q: "¿Cuál de los siguientes animales NO pertenece al orden Rodentia?", options: ["Hámster", "Conejillo de Indias", "Murciélago", "Capibara"], correct: 2 },
+  { q: "¿Qué característica dental distingue a los roedores?", options: ["Incisivos curvos y puntiagudos", "Dientes de crecimiento continuo", "Presencia de caninos desarrollados", "Falta total de premolares"], correct: 1 },
+  { q: "¿Qué espacio vacío se encuentra entre los incisivos y los molares?", options: ["Arco cigomático", "Diastema", "Conducto dental", "Cavidad bucal"], correct: 1 },
+  { q: "El capibara puede alcanzar un peso superior a:", options: ["10 kg", "25 kg", "60 kg", "100 kg"], correct: 2 },
+  { q: "Los bigotes o vibrisas en los roedores sirven principalmente para:", options: ["Regular la temperatura corporal", "Detectar vibraciones y orientarse", "Masticar mejor los alimentos", "Almacenar grasa"], correct: 1 },
+  { q: "¿Qué tipo de dieta presentan la mayoría de los roedores?", options: ["Exclusivamente herbívora", "Exclusivamente carnívora", "Omnívora", "Frugívora"], correct: 2 },
+  { q: "¿Cuál de estos roedores puede capturar peces?", options: ["Rata", "Puercoespín", "Ardilla voladora", "Capibara"], correct: 0 },
+  { q: "¿Qué característica reproductiva es común en roedores?", options: ["Gestación prolongada", "Camadas pequeñas y únicas", "Reproducción frecuente con muchas crías", "Huevos con cáscara blanda"], correct: 2 },
+  { q: "En algunas especies, la vagina permanece cerrada cuando:", options: ["Están preñadas", "No están en época reproductiva", "Amamantan", "Cambian de pelaje"], correct: 1 },
+  { q: "¿Qué roedor tiene crías muy desarrolladas al nacer?", options: ["Ratón", "Hámster", "Cobayo", "Jerbo"], correct: 2 },
+  { q: "¿Cuál es una función ecológica destacada de los roedores?", options: ["Predar sobre mamíferos grandes", "Dispersar semillas", "Fijar nitrógeno en el suelo", "Controlar hongos"], correct: 1 },
+  { q: "¿Qué papel cumplen los roedores como 'ingenieros del ecosistema'?", options: ["Modifican el clima", "Airean y remueven el suelo al excavar", "Controlan incendios naturales", "Polinizan árboles tropicales"], correct: 1 },
+  { q: "Los roedores son fundamentales en las cadenas tróficas porque:", options: ["Son grandes depredadores", "Compiten con aves y reptiles", "Constituyen presas de muchos carnívoros", "Evitan la propagación de plantas"], correct: 2 },
+  { q: "¿Por qué se consideran bioindicadores?", options: ["Por su longevidad", "Por su coloración", "Porque reflejan el estado de los ecosistemas", "Porque migran largas distancias"], correct: 2 },
+  { q: "El orden Rodentia pertenece al clado:", options: ["Xenarthra", "Laurasiatheria", "Glires", "Afrotheria"], correct: 2 },
+  { q: "¿Con qué otro orden comparten el clado Glires?", options: ["Lagomorpha", "Carnivora", "Primates", "Chiroptera"], correct: 0 },
+  { q: "Los primeros roedores aparecieron hace aproximadamente:", options: ["250 millones de años", "100 millones de años", "65 millones de años", "10 millones de años"], correct: 2 },
+  { q: "¿Qué evento marcó el surgimiento de los primeros roedores?", options: ["Formación de los continentes", "Extinción de los dinosaurios", "Aparición del Homo sapiens", "Glaciación del Pleistoceno"], correct: 1 },
+  { q: "El probable ancestro común de los roedores fue:", options: ["Un primate arborícola", "Un marsupial", "Un mamífero insectívoro nocturno", "Un reptil ovíparo"], correct: 2 },
+  { q: "¿En qué continentes se diversificaron ampliamente los roedores durante el Eoceno y Oligoceno?", options: ["África y Oceanía", "Asia y Sudamérica", "Europa y Norteamérica", "Oceanía y Europa"], correct: 1 },
+  { q: "¿Qué subfamilia de roedores muestra una radiación adaptativa en Sudamérica?", options: ["Murinae", "Sigmodontinae", "Sciurinae", "Caviinae"], correct: 1 },
+  { q: "Los Sciuromorfos incluyen principalmente:", options: ["Ardillas y lirones", "Ratas y ratones", "Puercoespines y capibaras", "Jerbos y tuzas"], correct: 0 },
+  { q: "Los Myomorfos comprenden familias como:", options: ["Muridae y Cricetidae", "Hystricidae y Caviidae", "Castoridae y Heteromyidae", "Anomaluridae y Pedetidae"], correct: 0 },
+  { q: "Los Sciurognatos tienen el ángulo mandibular:", options: ["Desviado lateralmente", "Alineado con los incisivos", "En forma de gancho", "En posición ventral"], correct: 1 },
+  { q: "Los Histricognatos presentan el ángulo mandibular:", options: ["En línea recta", "Reducido", "Proyectado lateralmente", "Fijo al cráneo"], correct: 2 },
+  { q: "¿Qué especie muestra cuidado parental cooperativo?", options: ["Puercoespín", "Rata topo desnuda", "Marmotas", "Jerbo"], correct: 2 },
+  { q: "El ratón canguro (Dipodomys spp.) destaca por:", options: ["Su vuelo planeador", "Su reflejo ultrarrápido frente a depredadores", "Su capacidad de almacenar agua", "Su comportamiento subterráneo"], correct: 1 },
+  { q: "¿Qué función cumplen las bolsas en las mejillas de algunos roedores?", options: ["Regular la temperatura", "Guardar alimento", "Emitir sonidos", "Transportar crías"], correct: 1 },
+  { q: "¿Qué característica del pelaje es típica de las chinchillas?", options: ["Ausencia total de pelo", "Pelaje muy denso y suave", "Pelaje espinoso", "Escamas córneas"], correct: 1 },
+  { q: "¿Qué relación tienen los roedores con los humanos?", options: ["Ninguna", "Solo negativa, como plagas", "Negativa y positiva, según la especie", "Exclusivamente simbiótica"], correct: 2 },
+];
 
-startBtn.onclick = ()=>{
-  socket.emit("startGame");
-  startBtn.disabled=true;
-};
-
-// =================== PREGUNTAS ===================
-socket.on("newQuestion", data=>{
-  currentQuestion = data;
-  questionText.textContent = data.q;
-  optionsDiv.innerHTML="";
-  data.options.forEach((opt,i)=>{
-    const btn = document.createElement("button");
-    btn.className="option";
-    btn.textContent=opt;
-    btn.onclick = ()=>{ socket.emit("answer", {playerId, answer:i}); setOptionsEnabled(false); }
-    optionsDiv.appendChild(btn);
-  });
-  setOptionsEnabled(true);
-});
-
-function setOptionsEnabled(enabled){
-  const btns = document.querySelectorAll("#options button");
-  btns.forEach(b=>b.disabled = !enabled);
+function startTimer(){
+clearInterval(timer);
+timeLeft=30; timerDisplay.textContent=timeLeft;
+timer=setInterval(()=>{
+timeLeft--;
+timerDisplay.textContent=timeLeft;
+if(timeLeft<=0){
+clearInterval(timer); log("⌛ Se acabó el tiempo, ambos reciben daño!");
+player.health-=10; enemy.health-=10; updateBars(); nextQuestion();
+}
+},1000);
 }
 
-// =================== ATAQUES EN TIEMPO REAL ===================
-socket.on("updateBattle", data=>{
-  if(data.player.id===playerId) playerData = data.player;
-  else rivalData = data.player;
-
-  playerImg.src = playerData.charImg;
-  enemyImg.src = rivalData.charImg;
-  document.getElementById("player-health").textContent = playerData.health;
-  document.getElementById("enemy-health").textContent = rivalData.health;
-
-  // Animaciones
-  if(data.attack){
-    if(data.attack.type==="normal"){
-      enemyImg.style.transform="scaleX(-1) translateX(20px)";
-      setTimeout(()=>{enemyImg.style.transform="scaleX(-1) translateX(0)";},300);
-    }
-    else if(data.attack.type==="special"){
-      switch(data.player.charName){
-        case "Ardilla Roja":
-          const nuez = document.createElement("img");
-          nuez.src="nuez.png";
-          nuez.style.position="absolute"; nuez.style.bottom="40px"; nuez.style.left="50px";
-          nuez.style.width="40px"; nuez.style.height="40px"; nuez.style.transition="all 0.6s linear"; nuez.style.zIndex="10";
-          document.getElementById("battlefield").appendChild(nuez);
-          let rot=0;
-          const rotInterval = setInterval(()=>{ rot+=30; nuez.style.transform=`rotate(${rot}deg)`; },50);
-          setTimeout(()=>{ clearInterval(rotInterval); nuez.style.left="450px"; nuez.style.bottom="60px"; nuez.style.width="80px"; nuez.style.height="80px"; },50);
-          setTimeout(()=>{ nuez.remove(); enemyImg.style.transform="scaleX(-1) translateX(15px)"; setTimeout(()=>{enemyImg.style.transform="scaleX(-1) translateX(0)";},300); },600);
-          break;
-        case "Ratón":
-          enemyImg.style.transform="scaleX(-1) translateX(40px)";
-          setTimeout(()=>{enemyImg.style.transform="scaleX(-1) translateX(-20px)";},200);
-          setTimeout(()=>{enemyImg.style.transform="scaleX(-1) translateX(0)";},400);
-          break;
-        case "Capibara":
-          enemyImg.style.filter="brightness(2) drop-shadow(0 0 15px limegreen)";
-          setTimeout(()=>{enemyImg.style.filter="none";},1200);
-          break;
-      }
-    }
-  }
-
-  // Especial listo
-  if(playerData.specialReady) specialButton.disabled=false;
-  else specialButton.disabled=true;
+function nextQuestion(){
+if(!questions.length) return;
+const idx=Math.floor(Math.random()*questions.length);
+currentQuestion=questions[idx];
+questionText.textContent=currentQuestion.q;
+optionsDiv.innerHTML="";
+currentQuestion.options.forEach(opt=>{
+const btn=document.createElement("button");
+btn.className="option"; btn.textContent=opt;
+btn.onclick=()=>handleAnswer(opt); optionsDiv.appendChild(btn);
 });
-
-// =================== USO DE HABILIDAD ===================
-specialButton.onclick = ()=>{
-  if(!playerData.specialReady) return;
-  socket.emit("useSpecial", {playerId});
-  specialButton.disabled=true;
-};
-
-// =================== LOG ===================
-socket.on("log", msg=>{
-  log(msg);
-});
-
-function log(msg){
-  logDiv.innerHTML+=msg+"<br>";
-  logDiv.scrollTop=logDiv.scrollHeight;
+startTimer();
 }
+
+function handleAnswer(opt){
+clearInterval(timer);
+if(opt===currentQuestion.a){
+log("✅ Correcto!"); score+=10; playerStreak++;
+updateEnergy();
+performAttack(player,enemy);
+}else{
+log("❌ Incorrecto!"); player.health-=15; updateBars();
+}
+nextQuestion();
+}
+
+function updateBars(){
+playerHealthBar.style.width=player.health+"%";
+enemyHealthBar.style.width=enemy.health+"%";
+scoreDisplay.textContent=score;
+}
+
+function updateEnergy(){
+if(playerStreak>=3){
+specialButton.disabled=false;
+for(let i=1;i<=3;i++) document.getElementById("energy"+i).classList.add("full");
+}
+}
+
+specialButton.onclick=function(){
+log("💥 Habilidad especial activada!");
+playerStreak=0;
+specialButton.disabled=true;
+for(let i=1;i<=3;i++) document.getElementById("energy"+i).classList.remove("full");
+performSpecial(player,enemy);
+}
+
+function performAttack(attacker,defender){
+const atkImg=document.createElement("img"); atkImg.className="projectile";
+atkImg.src=attacker.character.attackImg;
+battlefield.appendChild(atkImg);
+atkImg.style.left=attacker===player?"30px":"auto";
+atkImg.style.right=attacker===enemy?"30px":"auto";
+atkImg.style.bottom="50px";
+
+atkImg.animate([{transform:'translateX(0)'},{transform:attacker===player?'translateX(200px)':'translateX(-200px)'}],{duration:400,fill:'forwards'});
+
+setTimeout(()=>{
+defender.health-=20; updateBars();
+atkImg.remove();
+},400);
+}
+
+function performSpecial(attacker,defender){
+if(attacker.character.special==="nuez"){
+const nut=document.createElement("img"); nut.className="projectile"; nut.src="nuez.png";
+battlefield.appendChild(nut); nut.style.left="30px"; nut.style.bottom="60px";
+nut.animate([{transform:'translateX(0)'},{transform:'translateX(200px)'}],{duration:600,fill:'forwards'});
+setTimeout(()=>{defender.health-=35; updateBars(); nut.remove();},600);
+}
+if(attacker.character.special==="doble"){
+performAttack(attacker,defender);
+setTimeout(()=>performAttack(attacker,defender),450);
+}
+if(attacker.character.special==="meditar"){
+const med=document.createElement("div"); med.className="meditation"; battlefield.appendChild(med);
+setTimeout(()=>{attacker.health=Math.min(attacker.health+30,100); updateBars(); med.remove();},1000);
+}
+}
+
+function initBattle(p,e){
+player=p; enemy=e;
+player.health=100; enemy.health=100; score=0; playerStreak=0;
+playerImg.src=p.character.img; enemyImg.src=e.character.img;
+updateBars();
+nextQuestion();
+}
+
+socket.on("startBattle",data=>{initBattle(data.player,data.enemy);});
 </script>
 </body>
 </html>
