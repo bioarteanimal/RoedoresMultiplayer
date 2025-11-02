@@ -1,18 +1,20 @@
 const express = require("express");
-const http = require("http");
 const path = require("path");
-const { Server } = require("socket.io");
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const PORT = process.env.PORT || 10000;
 
-// Serve static files from /public
-app.use(express.static(path.join(process.cwd(), 'public')));
+// Servir archivos estáticos desde la raíz del proyecto
+app.use(express.static(path.resolve(__dirname)));
 
-// Ruta raíz para servir index.html manualmente
-app.get('/', (req, res) => {
-  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
+// Ruta raíz: enviar index.html desde la raíz
+app.get("/", (req, res) => {
+  res.sendFile(path.resolve(__dirname, "index.html"));
+});
+
+// Arrancar el servidor
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
 
 // In-memory rooms
