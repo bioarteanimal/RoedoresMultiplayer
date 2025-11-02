@@ -1,175 +1,217 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Batalla de Roedores - Multiplayer</title>
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
+<title>Batalla de Roedores Online</title>
 <style>
-  body { background: linear-gradient(#19191a,#04293a); font-family: monospace; color:#fff; text-align:center; margin:0; padding:0;}
-  #game-container { width:90%; max-width:720px; margin:20px auto; border:4px solid #000; background:#fff8e7; border-radius:12px; padding:15px; color:#111; position:relative;}
-  #battlefield { position:relative; width:100%; height:260px; background: url("img/fondo_bosque.png") no-repeat center center / cover; border:2px solid #000; margin-bottom:15px; border-radius:8px; overflow:hidden; }
-  #player,#enemy { position:absolute; bottom:20px; width:120px; transition: transform 0.4s ease; }
-  #player{ left:30px } #enemy{ right:30px; transform:scaleX(-1); }
+  body { background: linear-gradient(#19191a,#04293a); font-family: 'PixelOperator', monospace; color:#fff; text-align:center; margin:0; padding:0;}
+  #game-container { width:90%; max-width:720px; margin:20px auto; border:4px solid #000; background:#fff8e7; border-radius:12px; box-shadow:0 0 10px #0005; padding:15px; color:#111; position:relative;}
+  h2 { margin:8px 0 12px 0; color:#080808; }
   .health-bar { height:20px; width:90%; max-width:500px; background:#ddd; border:2px solid #000; margin:5px auto; border-radius:8px; overflow:hidden; }
-  .health-fill { height:100%; background:#4caf50; width:100%; transition: width 0.3s; }
-  #log { background:#fff; border:2px solid #000; border-radius:6px; height:120px; overflow-y:auto; padding:5px; text-align:left; color:#000; }
+  .health-fill { height:100%; background:#4caf50; width:100%; max-width:100%; transition: width 0.3s; }
+  #battlefield { position:relative; width:100%; height:260px; background: url("fondo_bosque.png") no-repeat center center / cover; border:2px solid #000; margin-bottom:15px; border-radius:8px; overflow:hidden; }
+  #player,#enemy { position:absolute; bottom:20px; width:120px; image-rendering:pixelated; transition: transform 0.4s ease; }
+  #player{ left:30px } #enemy{ right:30px; transform:scaleX(-1); }
+  #question-container { background:#f0e68c; border:2px solid #000; border-radius:8px; padding:10px; margin-bottom:10px; }
   .option { display:block; background:#fff; border:2px solid #000; border-radius:6px; padding:8px; margin:6px auto; width:90%; cursor:pointer; font-weight:bold; }
-  #room-ui { margin:10px 0; display:flex; gap:8px; justify-content:center; }
-  #room-code { font-weight:bold; padding:6px 10px; background:#fff; color:#000; border-radius:6px; border:2px solid #000; }
+  .option:hover{ background:#cde } .option:disabled{ opacity:0.6; cursor:default }
+  #log { background:#fff; border:2px solid #000; border-radius:6px; height:100px; overflow-y:auto; padding:5px; text-align:left; font-size:12px; color:#000; }
+  #special-button { background:#ffeb3b; border:3px solid #000; border-radius:6px; padding:8px; cursor:pointer; margin-top:5px; font-weight:bold; }
+  #special-button:disabled { opacity:0.6; cursor:default }
+  #game-over { display:none; background:rgba(0,0,0,0.7); position:absolute; top:0; left:0; right:0; bottom:0; color:white; font-size:16px; justify-content:center; align-items:center; flex-direction:column; z-index:20; }
+  #restart-btn { background:#00e676; border:2px solid #000; padding:10px; cursor:pointer; border-radius:6px; margin-top:10px; font-weight:bold; }
+  #character-selection button{ margin:5px; padding:8px; cursor:pointer; font-weight:bold; }
+  #status-bar { font-weight:bold; font-size:16px; margin-bottom:6px; color:#000; }
+
+  #energy-container { display:flex; justify-content:center; gap:6px; margin:5px auto; }
+  .energy-segment { width:60px; height:18px; background:#ddd; border:2px solid #000; border-radius:6px; overflow:hidden; }
+  .energy-fill { height:100%; width:0%; background:#00bcd4; transition: width 0.3s; }
+  .energy-fill.full { width:100%; background:#ffeb3b; animation: pulseEnergy 1s infinite alternate; }
+  @keyframes pulseEnergy { 0%{ filter:brightness(1);} 100%{ filter:brightness(1.6);} }
 </style>
 </head>
 <body>
 <div id="game-container">
-  <h2>Roedores a por la supervivencia</h2>
-  <div id="room-ui"></div>
-  <div id="character-selection">
+  <h2>Roedores Online: Batalla</h2>
+
+  <div id="lobby">
+    <p>Nombre del jugador: <input type="text" id="playerName" placeholder="Tu nombre"></p>
+    <button id="join-btn">Unirse</button>
+    <div id="players-list"></div>
+    <button id="start-btn" disabled>Comenzar Batalla</button>
+  </div>
+
+  <div id="character-selection" style="display:none;">
     <p>Elige tu personaje:</p>
     <button onclick="selectPlayer(0)">Ardilla Roja</button>
     <button onclick="selectPlayer(1)">Ratón</button>
     <button onclick="selectPlayer(2)">Capibara</button>
   </div>
-  <div id="battlefield">
+
+  <div id="battlefield" style="display:none;">
     <img id="player" src="" alt="Jugador">
-    <img id="enemy" src="" alt="Enemigo">
+    <img id="enemy" src="" alt="Rival">
+    <div id="game-over" style="display:flex">
+      <p id="game-over-text">🎉 ¡Juego terminado! 🎉</p>
+      <button id="restart-btn">Jugar nueva partida</button>
+    </div>
   </div>
-  <div>
-    <strong>Salud Jugador:</strong>
-    <div class="health-bar"><div id="player-health" class="health-fill"></div></div>
-    <strong>Salud Enemigo:</strong>
-    <div class="health-bar"><div id="enemy-health" class="health-fill"></div></div>
+
+  <div id="status-bar" style="display:none;">
+    Salud: <span id="player-health-display">0</span>/<span id="player-max-health">0</span> | 
+    Rival: <span id="enemy-health-display">0</span>/<span id="enemy-max-health">0</span> | 
+    Tiempo: <span id="timer-display">30</span>s
   </div>
-  <div id="question-container">
+
+  <div id="question-container" style="display:none;">
     <p id="question-text"></p>
     <div id="options"></div>
   </div>
+
+  <button id="special-button" disabled style="display:none;">Habilidad Especial</button>
   <div id="log"></div>
 </div>
 
+<script src="/socket.io/socket.io.js"></script>
 <script>
-// minimal question set (keep full in your local if needed)
-const questions = [
-  { q: "¿Qué orden de mamíferos es el más diverso del planeta?", options: ["Carnivora","Rodentia","Chiroptera","Primates"], correct:1},
-  { q: "¿En qué continente no se encuentran los roedores de forma natural?", options: ["Asia","Oceanía","África","Antártida"], correct:3}
-];
-
-const playersChars = [
-  { name: "Ardilla Roja", img: "img/Ardilla roja.png", attackImg: "img/Ardilla_ataque.png", maxHealth: 100 },
-  { name: "Ratón", img: "img/Raton.png", attackImg: "img/Raton_ataque.png", maxHealth: 80 },
-  { name: "Capibara", img: "img/Capibara.png", attackImg: "img/Capibara_ataque.png", maxHealth: 120 }
-];
-
-const genericEnemies = [
-  { name: "Jaguar", img: "img/Jaguar.png", maxHealth: 150, power: 15 },
-  { name: "Búho", img: "img/Buho.png", maxHealth: 100, power: 10 }
-];
-
-let chosenCharIndex = 0;
-let myName = "Jugador" + Math.floor(Math.random()*999);
-let myId = null;
-let roomCode = null;
-let isHost = false;
-let currentDuel = null;
-let player = null;
-let enemy = null;
-let timer = null;
+// ===================== SOCKET.IO =====================
+const socket = io();
+let playerId = null;
+let playerData = null;
+let rivalData = null;
+let currentQuestion = null;
+let timerInterval = null;
 let timeLeft = 30;
 
-const questionText = document.getElementById("question-text");
-const optionsDiv = document.getElementById("options");
-const playerHealthBar = document.getElementById("player-health");
-const enemyHealthBar = document.getElementById("enemy-health");
-const logDiv = document.getElementById("log");
-const playerImg = document.getElementById("player");
-const enemyImg = document.getElementById("enemy");
+// ===================== LOBBY =====================
+const joinBtn = document.getElementById("join-btn");
+const startBtn = document.getElementById("start-btn");
+const playerNameInput = document.getElementById("playerName");
+const playersListDiv = document.getElementById("players-list");
+
+joinBtn.onclick = () => {
+  const name = playerNameInput.value.trim();
+  if(!name) return alert("Escribe tu nombre");
+  socket.emit("joinLobby", name);
+  joinBtn.disabled = true;
+};
+
+startBtn.onclick = () => {
+  socket.emit("startBattle");
+};
+
+socket.on("updateLobby", players => {
+  playersListDiv.innerHTML = players.map(p => p.name).join("<br>");
+  startBtn.disabled = players.length<2;
+});
+
+socket.on("playerId", id => { playerId = id; });
+
+// ===================== PERSONAJES =====================
+const players = [
+  { name: "Ardilla Roja", img: "Ardilla roja.png", attackImg: "Ardilla_ataque.png", maxHealth: 100 },
+  { name: "Ratón", img: "Raton.png", attackImg: "Raton_ataque.png", maxHealth: 80 },
+  { name: "Capibara", img: "Capibara.png", attackImg: "Capibara_ataque.png", maxHealth: 120 }
+];
 
 function selectPlayer(index) {
-  chosenCharIndex = index;
-  player = {...playersChars[index]};
-  player.health = player.maxHealth;
-  playerImg.src = player.img;
-  document.getElementById("character-selection").style.display = "none";
-  log("Has elegido: " + player.name);
+  playerData = { ...players[index], health: players[index].maxHealth, streak: 0, specialReady:false };
+  document.getElementById("player").src = playerData.img;
+  document.getElementById("character-selection").style.display="none";
+  document.getElementById("battlefield").style.display="block";
+  document.getElementById("status-bar").style.display="block";
+  document.getElementById("question-container").style.display="block";
+  document.getElementById("special-button").style.display="block";
+  socket.emit("characterSelected", index);
 }
 
-function startLocalDuel(opponentName, opponentIsBot) {
-  const botEnemy = genericEnemies[Math.floor(Math.random()*genericEnemies.length)];
-  enemy = { name: opponentName || botEnemy.name, img: opponentIsBot ? botEnemy.img : botEnemy.img, maxHealth: botEnemy.maxHealth, health: botEnemy.maxHealth, power: botEnemy.power };
-  enemyImg.src = enemy.img;
-  if (!player) selectPlayer(chosenCharIndex);
-  player.health = player.maxHealth;
-  enemy.health = enemy.maxHealth;
-  updateBars();
-  startNextQuestion();
-}
+// ===================== PREGUNTAS =====================
+const questions = [
+  { q:"¿Qué orden de mamíferos es el más diverso?", options:["Carnivora","Rodentia","Chiroptera","Primates"], correct:1 },
+  { q:"¿Cuántas especies aproximadas de roedores existen?", options:["500","1.200","2.050","4.000"], correct:2 },
+  { q:"¿En qué continente no se encuentran los roedores?", options:["Asia","Oceanía","África","Antártida"], correct:3 },
+  { q:"¿Cuál de estos NO pertenece a Rodentia?", options:["Hámster","Conejillo de Indias","Murciélago","Capibara"], correct:2 }
+  // puedes añadir más...
+];
 
-function startTimer() {
-  clearInterval(timer);
-  timeLeft = 30;
-  timer = setInterval(()=>{ timeLeft--; if (timeLeft<=0){ clearInterval(timer); log("Tiempo agotado"); enemyAttackDueToTimeout(); } },1000);
-}
-
-function startNextQuestion() {
-  if (!questions || questions.length===0) return finishLocalDuel(false);
-  const q = questions[Math.floor(Math.random()*questions.length)];
-  questionText.textContent = q.q;
+function displayQuestion(q) {
+  currentQuestion = q;
+  document.getElementById("question-text").textContent = q.q;
+  const optionsDiv = document.getElementById("options");
   optionsDiv.innerHTML = "";
-  q.options.forEach((opt,i)=>{ const btn = document.createElement("button"); btn.className='option'; btn.textContent=opt; btn.onclick=()=>handleAnswer(i,q); optionsDiv.appendChild(btn); });
-  startTimer();
-}
-
-function handleAnswer(selectedIndex,q) {
-  clearInterval(timer);
-  setOptionsEnabled(false);
-  if (selectedIndex === q.correct) {
-    enemy.health -= 15;
-    log("Respuesta correcta!");
-    if (enemy.health<=0) return finishLocalDuel(true);
-  } else {
-    player.health -= (enemy.power||10);
-    log("Incorrecto!");
-    if (player.health<=0) return finishLocalDuel(false);
-  }
-  updateBars();
-  setTimeout(()=>{ setOptionsEnabled(true); startNextQuestion(); },900);
-}
-
-function enemyAttackDueToTimeout(){ player.health -= (enemy.power||10); updateBars(); setTimeout(()=>{ setOptionsEnabled(true); startNextQuestion(); },900); }
-
-function setOptionsEnabled(enabled){ document.querySelectorAll("#options button").forEach(b=>b.disabled=!enabled); }
-
-function finishLocalDuel(didWin){ clearInterval(timer); log(didWin? "Has ganado":"Has perdido"); if (socket) socket.emit('playerResult', { code: roomCode, playerId: myId, winnerTeam: didWin? null : null }); setOptionsEnabled(false); }
-
-function updateBars(){ if (!player||!enemy) return; playerHealthBar.style.width = Math.max(0,(player.health/player.maxHealth)*100) + '%'; enemyHealthBar.style.width = Math.max(0,(enemy.health/enemy.maxHealth)*100) + '%'; }
-
-function log(msg){ logDiv.innerHTML += msg + "<br>"; logDiv.scrollTop = logDiv.scrollHeight; }
-
-// --- Socket.IO client
-const socket = (typeof io !== 'undefined') ? io() : null;
-if (socket) socket.on('connect', ()=>{ myId = socket.id; });
-
-const wantCreate = confirm("¿Crear una sala nueva? (Aceptar=Crear, Cancelar=Unirse)");
-myName = prompt("Tu nombre:", myName) || myName;
-if (wantCreate) { if (socket) socket.emit('createRoom', { name: myName }); else log("No socket"); }
-else { const code = prompt("Introduce el código de la sala:"); roomCode = code; if (socket) socket.emit('joinRoom', { code, name: myName }); }
-
-if (socket) {
-  socket.on('roomCreated', ({code}) => {
-    roomCode = code; isHost = true;
-    const roomUI = document.getElementById('room-ui'); roomUI.innerHTML = `<div id="room-code">Código: ${code}</div>`;
-    const copyBtn = document.createElement('button'); copyBtn.textContent='📋 Copiar código'; copyBtn.onclick=()=>navigator.clipboard.writeText(code); roomUI.appendChild(copyBtn);
-    const startBtn = document.createElement('button'); startBtn.textContent='▶️ Iniciar Partida'; startBtn.onclick=()=>socket.emit('startGame', roomCode); roomUI.appendChild(startBtn);
+  q.options.forEach((opt,i)=>{
+    const btn = document.createElement("button");
+    btn.textContent = opt;
+    btn.className="option";
+    btn.onclick = ()=>submitAnswer(i);
+    optionsDiv.appendChild(btn);
   });
-  socket.on('invalidCode', ()=> alert('Código inválido'));
-  socket.on('playerJoined', ({name, team})=> log(name + ' se unió al equipo ' + team));
-  socket.on('botAdded', ({botName, team})=> log(botName + ' añadido al equipo ' + team));
-  socket.on('newRound', ({round, duels})=>{ log('Ronda ' + round); const myD = duels.find(d=> d.ids.includes(myId)); if (myD){ const opponentIndex = myD.ids[0]===myId?1:0; const opponentName = myD.names[opponentIndex]; const opponentId = myD.ids[opponentIndex]; const opponentIsBot = typeof opponentId === 'string' && opponentId.startsWith && opponentId.startsWith('BOT_'); log('Te enfrentarás a ' + opponentName); startLocalDuel(opponentName, opponentIsBot); } else { log('Sin duelo esta ronda'); setOptionsEnabled(false); } });
-  socket.on('roundEnded', ({round, teams, scores, duels})=>{ log('Fin ronda ' + round); duels.forEach(d=>{ if (d.winner) log(d.names[0] + ' vs ' + d.names[1] + ' → Ganador equipo ' + d.winner); }); setOptionsEnabled(false); });
-  socket.on('botAnswer', ({botId, botTeam, correct, winner})=> log(botId + ' ('+botTeam+') ' + (correct? 'acertó':'falló') + ' → gana ' + winner));
-  socket.on('matchEnded', ({scores, winner})=> log('Torneo finalizado. Ganador: ' + winner));
-} else {
-  log('Socket.IO no disponible. El modo multijugador no funcionará hasta que subas esto a un servidor con Socket.IO.');
+  timeLeft = 30;
+  document.getElementById("timer-display").textContent=timeLeft;
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    timeLeft--;
+    document.getElementById("timer-display").textContent=timeLeft;
+    if(timeLeft<=0){
+      clearInterval(timerInterval);
+      socket.emit("timeOut");
+    }
+  },1000);
 }
+
+function submitAnswer(index){
+  clearInterval(timerInterval);
+  socket.emit("answer", { answer:index, time:30-timeLeft });
+}
+
+// ===================== RECEPCIÓN DE DATOS =====================
+socket.on("nextQuestion", q=>displayQuestion(q));
+
+socket.on("updateHealth", data=>{
+  if(playerId===data.playerId){
+    playerData.health=data.health;
+    document.getElementById("player-health-display").textContent=data.health;
+    document.getElementById("player-max-health").textContent=playerData.maxHealth;
+  } else {
+    rivalData=data;
+    document.getElementById("enemy-health-display").textContent=data.health;
+    document.getElementById("enemy-max-health").textContent=data.maxHealth;
+    document.getElementById("enemy").src=players[data.charIndex].img;
+  }
+});
+
+socket.on("attackAnimation", data=>{
+  if(playerId===data.playerId)return; // no animar mi propio ataque
+  const enemyImg = document.getElementById("enemy");
+  switch(data.type){
+    case "normal":
+      enemyImg.style.transform="scaleX(-1) translateX(20px)";
+      setTimeout(()=>{enemyImg.style.transform="scaleX(-1) translateX(0)";},300);
+      break;
+    case "special":
+      if(data.charName==="Ardilla Roja"){
+        const nuez = document.createElement("img");
+        nuez.src="nuez.png";
+        nuez.style.position="absolute"; nuez.style.bottom="40px"; nuez.style.left="50px"; nuez.style.width="40px"; nuez.style.height="40px"; nuez.style.transition="all 0.5s linear"; nuez.style.zIndex="10";
+        document.getElementById("battlefield").appendChild(nuez);
+        setTimeout(()=>{ nuez.style.left="450px"; nuez.style.bottom="60px"; nuez.style.width="80px"; nuez.style.height="80px"; nuez.remove();},500);
+      } else if(data.charName==="Ratón"){
+        enemyImg.style.transform="scaleX(-1) translateX(50px)";
+        setTimeout(()=>{enemyImg.style.transform="scaleX(-1) translateX(0)";},400);
+      } else if(data.charName==="Capibara"){
+        enemyImg.style.filter="brightness(1.5) drop-shadow(0 0 10px limegreen)";
+        setTimeout(()=>{enemyImg.style.filter="none";},1200);
+      }
+      break;
+  }
+});
+
+socket.on("battleEnd", data=>{
+  clearInterval(timerInterval);
+  alert(data.msg);
+  location.reload();
+});
 </script>
 </body>
 </html>
