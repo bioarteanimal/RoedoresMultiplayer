@@ -9,15 +9,15 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 10000;
 
-// === Servir los archivos estáticos directamente desde la raíz ===
+// === Servir archivos estáticos ===
 app.use(express.static(path.resolve(__dirname)));
 
-// === Enviar el archivo principal del juego ===
+// === Enviar index.html ===
 app.get("/", (req, res) => {
   res.sendFile(path.resolve(__dirname, "index.html"));
 });
 
-// === Estructura principal de salas ===
+// === Estructura de salas ===
 const rooms = {}; // code -> { host, code, round, players, bots, teams, scores, duels }
 
 // === Funciones auxiliares ===
@@ -44,6 +44,7 @@ function shuffle(arr) {
   return [...arr].sort(() => Math.random() - 0.5);
 }
 
+// Empareja jugadores de ambos equipos para duelos
 function pairTeams(teamA, teamB) {
   const shuffledA = shuffle(teamA);
   const shuffledB = shuffle(teamB);
@@ -54,14 +55,15 @@ function pairTeams(teamA, teamB) {
   return pairs;
 }
 
+// Broadcast del estado de la sala
 function broadcastState(code) {
   const room = rooms[code];
   if (!room) return;
   io.to(code).emit("updateState", {
     round: room.round,
     teams: {
-      A: room.teams.A.map(p => ({ id: p.id, name: p.name, team: p.team, char: p.char })),
-      B: room.teams.B.map(p => ({ id: p.id, name: p.name, team: p.team, char: p.char })),
+      A: room.teams.A.map(p => ({ id: p.id, name: p.name, team: p.team, char: p.char || null })),
+      B: room.teams.B.map(p => ({ id: p.id, name: p.name, team: p.team, char: p.char || null })),
     },
     scores: room.scores,
     duels: room.duels,
@@ -123,7 +125,7 @@ io.on("connection", (socket) => {
     const room = rooms[code];
     if (!room) return;
 
-    // Añadir bot si falta un jugador
+    // Balancear equipos agregando bots si hace falta
     if (room.teams.A.length !== room.teams.B.length) {
       const bot = createBot(room.bots.length + 1);
       const target = room.teams.A.length < room.teams.B.length ? "A" : "B";
@@ -249,4 +251,4 @@ function endMatch(code) {
 }
 
 // === Iniciar servidor ===
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Servidor iniciado en puerto ${PORT}`));
