@@ -1,7 +1,12 @@
 const express = require("express");
 const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 const PORT = process.env.PORT || 10000;
 
 // Servir archivos estáticos desde la raíz del proyecto
@@ -10,11 +15,6 @@ app.use(express.static(path.resolve(__dirname)));
 // Ruta raíz: enviar index.html desde la raíz
 app.get("/", (req, res) => {
   res.sendFile(path.resolve(__dirname, "index.html"));
-});
-
-// Arrancar el servidor
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
 
 // In-memory rooms
@@ -77,7 +77,6 @@ io.on("connection", (socket) => {
     };
     const player = { id: socket.id, name, team: null, points: 0, host: true };
     rooms[code].players.push(player);
-    // balance teams (first player goes to A)
     player.team = 'A';
     rooms[code].teams.A.push(player);
     socket.join(code);
@@ -105,7 +104,6 @@ io.on("connection", (socket) => {
   socket.on("startGame", (code) => {
     const room = rooms[code];
     if (!room) return;
-    // add bot if needed (only at start)
     if (room.teams.A.length !== room.teams.B.length) {
       const bot = createBot(room.bots.length + 1);
       const target = room.teams.A.length < room.teams.B.length ? "A" : "B";
@@ -146,18 +144,15 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    // remove player from any rooms
     for (const code in rooms) {
       const room = rooms[code];
       room.players = room.players.filter(p => p.id !== socket.id);
       room.teams.A = room.teams.A.filter(p => p.id !== socket.id);
       room.teams.B = room.teams.B.filter(p => p.id !== socket.id);
-      // if host left, assign new host
       if (room.host === socket.id) {
         if (room.players.length > 0) {
           room.host = room.players[0].id;
         } else {
-          // delete empty room
           delete rooms[code];
         }
       }
@@ -180,7 +175,6 @@ function startRound(code) {
   io.to(code).emit("newRound", { round: room.round, duels: room.duels });
   broadcastState(code);
 
-  // simulate bots responses (only bots in room.bots)
   room.bots.forEach(bot => {
     const delay =
       bot.mode === "torpe"
