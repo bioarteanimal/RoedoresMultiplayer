@@ -8,10 +8,11 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Serve static files from /public
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(process.cwd(), 'public')));
 
+// Ruta raíz para servir index.html manualmente
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
 });
 
 // In-memory rooms
