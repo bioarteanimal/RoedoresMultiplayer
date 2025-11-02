@@ -1,12 +1,19 @@
 {
-  "name": "roedoresmultiplayer",
+  "name": "batalla-roedores-online",
   "version": "1.0.0",
+  "description": "Juego online de batalla de roedores con ataques especiales y rondas",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
+  "keywords": ["juego", "online", "socket.io", "express", "batalla"],
+  "author": "TuNombre",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
+    "express": "^4.18.2",
     "socket.io": "^4.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
